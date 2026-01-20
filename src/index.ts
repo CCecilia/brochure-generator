@@ -5,6 +5,8 @@ import { brochureCreationPrompt, evalutateLinksPrompt } from "./modules/prompts"
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+
+
 export interface Link {
   linkType: string;
   link: string;
@@ -12,6 +14,38 @@ export interface Link {
 
 export interface RelevantLinks {
   relevantLinks: Link[];
+}
+
+const args = Bun.argv;
+const inputCompanyName = args[2];
+const inputSite = args[3];
+
+function failureExit(): void {
+  console.error("Please provide a website address and company name");
+  console.log("Usage: index.ts <company_name> <website_url>");
+  process.exit(1);
+}
+
+function validateInput(): boolean {
+  if (!inputCompanyName || !inputSite) {
+    return false;
+  }
+  if (typeof inputCompanyName !== "string" || typeof inputSite !== "string") {
+    return false;
+  }
+
+  if (!URL.canParse(inputSite)) {
+    return false;
+  }
+  return true;
+}
+
+if (args.length < 4) {
+  failureExit();
+}
+
+if (!validateInput()) {
+  failureExit();
 }
 
 async function createBrochure(companyName: string, siteURL: URL) {
@@ -70,8 +104,6 @@ async function createBrochure(companyName: string, siteURL: URL) {
     },
   });
 
-  console.log(brochureResponse.message.content)
-
   return brochureResponse.message.content;
 }
 
@@ -81,7 +113,7 @@ async function saveToBrochure(companyName: string, content: string): Promise<voi
 
     await writeFile(filePath, content, "utf8");
 
-    console.log(`Successfully saved to ${filePath}`);
+    console.log(`Successfully Created Brochure\nsaved to: ${filePath}`);
   } catch (error) {
     console.error("Error saving the file:", error);
     throw error;
@@ -89,8 +121,8 @@ async function saveToBrochure(companyName: string, content: string): Promise<voi
 }
 
 const brochureContents = await createBrochure(
-  "hugging face",
-  new URL("https://huggingface.co/"),
+  inputCompanyName!,
+  new URL(inputSite!),
 );
 
-await saveToBrochure("hugging face", brochureContents)
+await saveToBrochure(inputCompanyName!, brochureContents);

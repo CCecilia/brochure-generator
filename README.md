@@ -1,4 +1,4 @@
-# bun-gemini-template
+# brochure-generator
 
 To install dependencies:
 
@@ -9,9 +9,7 @@ bun install
 To run:
 
 ```bash
-bun run dev
+bun run ./src/index.ts <company-name> <site-url>
 ```
-
-Please be sure to fill in GEMINI_API_KEY env var.
 
 This project was created using `bun init` in bun v1.3.6. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
