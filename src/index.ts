@@ -1,11 +1,26 @@
 import ollama from "ollama";
-import { scrapeLinks } from "./modules/scraper";
+import { scrapeSiteData } from "./modules/scraper";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { brochureCreationPrompt, evalutateLinksPrompt } from "./modules/prompts";
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
-async function createBrochure(siteURL: URL) {
-  const scrapedLinks = await scrapeLinks(siteURL);
-  const hrefs = scrapedLinks.map((url) => url.href);
+export interface Link {
+  linkType: string;
+  link: string;
+}
+
+export interface RelevantLinks {
+  relevantLinks: Link[];
+}
+
+async function createBrochure(companyName: string, siteURL: URL) {
+  const siteData = await scrapeSiteData(siteURL)
+
+  if (!siteData) {
+    throw new Error("failed to scrape target site")
+  }
+
   const responseSchema = z
     .object({
       relevantLinks: z
@@ -18,50 +33,64 @@ async function createBrochure(siteURL: URL) {
         .describe("Array of link objects {linkType: string, link: string}"),
     })
     .describe("Expected response schema");
-  const systemInstruction = `
-You are provided with a list of links found on a webpage.
-You are able to decide which of the links would be most relevant to include in a brochure about the company,
-such as links to an About page, or a Company page, or Careers/Jobs pages.
-You should respond in JSON as in this example:
-
-{
-  "relevantLinks": [
-    {"linkType": "about page", "link": "https://full.url/goes/here/about"},
-    {"linkType": "careers page", "link": "https://another.full.url/careers"}
-  ]
-}
-  `;
-  const userPrompt = `
-Here is the list of links on the website ${siteURL.href} -
-Please decide which of these are relevant web links for a brochure about the company,
-respond with the full https URL in JSON format.
-Do not include Terms of Service, Privacy, email links.
-
-Links (some might be relative links): \n${hrefs.join("\n")}
-  `;
-
+  const linksPrompt = evalutateLinksPrompt(siteURL, siteData)
   const response = await ollama.chat({
     model: "deepseek-r1:7b",
     messages: [
-      { role: "system", content: systemInstruction },
-      { role: "user", content: userPrompt },
+      { role: "system", content: linksPrompt.system },
+      { role: "user", content: linksPrompt.user },
     ],
+    format: "json",
     options: {
       temperature: 0,
     },
   });
 
   if (typeof response.message.content !== "string") {
-    throw new Error("Gemini failed to respond");
+    throw new Error("Ollama failed to respond properly");
   }
 
-  const structuredRes = responseSchema.parse(
+  const structuredLinkRes = responseSchema.parse(
     JSON.parse(response.message.content),
   );
-  console.log(structuredRes.relevantLinks);
 
-  return structuredRes.relevantLinks;
+  const brochurePrompt = brochureCreationPrompt(
+    companyName,
+    siteData,
+    structuredLinkRes.relevantLinks,
+  );
+  const brochureResponse = await ollama.chat({
+    model: "deepseek-r1:7b",
+    messages: [
+      { role: "system", content: brochurePrompt.system },
+      { role: "user", content: brochurePrompt.user },
+    ],
+    options: {
+      temperature: 0,
+    },
+  });
+
+  console.log(brochureResponse.message.content)
+
+  return brochureResponse.message.content;
 }
 
-await createBrochure(new URL("https://edwarddonner.com/"));
+async function saveToBrochure(companyName: string, content: string): Promise<void> {
+  try {
+    const filePath = join(process.cwd(), `${companyName.replaceAll(' ', '-')}.md`);
 
+    await writeFile(filePath, content, "utf8");
+
+    console.log(`Successfully saved to ${filePath}`);
+  } catch (error) {
+    console.error("Error saving the file:", error);
+    throw error;
+  }
+}
+
+const brochureContents = await createBrochure(
+  "hugging face",
+  new URL("https://huggingface.co/"),
+);
+
+await saveToBrochure("hugging face", brochureContents)

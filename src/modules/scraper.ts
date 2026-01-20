@@ -1,11 +1,11 @@
 import * as cheerio from "cheerio";
 
-/**
- * Scrapes a URL and returns an array of all unique absolute links found on the page.
- * @param url - The website URL to scrape
- * @returns Promise<string[]> - A list of unique URLs
- */
-export async function scrapeLinks(targetUrl: URL): Promise<URL[]> {
+export interface SiteData {
+  links: URL[],
+  contents: string
+}
+
+export async function scrapeSiteData(targetUrl: URL): Promise<SiteData | null> {
   try {
     const response = await fetch(targetUrl);
 
@@ -16,12 +16,31 @@ export async function scrapeLinks(targetUrl: URL): Promise<URL[]> {
     const html = await response.text();
     const $ = cheerio.load(html);
 
+    // Extract Title
+    const title = $("title").text().trim() || "No title found";
+
+    // Target the body element
+    const body = $("body");
+
+    if (body.length > 0) {
+      // Remove irrelevant tags
+      body.find("script, style, img, input, noscript, iframe").remove();
+
+      // Extract text and normalize whitespace (similar to BeautifulSoup's strip=True)
+      const text = body.text().replace(/\s\s+/g, "\n").trim();
+
+      const combined = `${title}\n\n${text}`;
+      combined.substring(0, 2000);
+    }
+
+    const contents = title.substring(0, 2000);
+
     // We store the 'href' string in the Set to ensure uniqueness,
     // as two different URL objects are never "equal" in JS.
     const uniqueHrefs = new Set<string>();
 
-    $('a').each((_, element) => {
-      const href = $(element).attr('href');
+    $("a").each((_, element) => {
+      const href = $(element).attr("href");
 
       if (href) {
         try {
@@ -34,10 +53,14 @@ export async function scrapeLinks(targetUrl: URL): Promise<URL[]> {
       }
     });
 
-    // Map the unique strings back into URL objects
-    return Array.from(uniqueHrefs).map(link => new URL(link));
+    const links = Array.from(uniqueHrefs).map((link) => new URL(link));
+
+    return {
+      links,
+      contents,
+    };
   } catch (error) {
     console.error(`Scraping failed: ${error}`);
-    return [];
+    return null;
   }
 }
