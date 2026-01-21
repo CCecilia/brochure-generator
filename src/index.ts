@@ -5,7 +5,7 @@ import { brochureCreationPrompt, evalutateLinksPrompt } from "./modules/prompts"
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-export const MODEL = "deepseek-r1:7b"
+export const MODEL = "deepseek-r1:14b"
 
 export interface Link {
   linkType: string;

@@ -56,9 +56,8 @@ Include details of company culture, customers and careers/jobs if you have the i
   const userPrompt = `
 You are looking at a company called: ${companyName}
 Here are the contents of its landing page and other relevant pages;
-use this information to build a short brochure of the company in markdown without code blocks.\n\n
-## Landing Page:\n${siteData.contents}\n\n
-${relevantLinkText}
+use this information to build a short brochure of the company in markdown without code blocks. Please include images in the brochure wher possible.\n\n
+## Landing Page:\n${siteData.contents}\n\n${relevantLinkText}
   `;
 
   return {
