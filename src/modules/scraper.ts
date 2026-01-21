@@ -1,11 +1,16 @@
+import ollama from "ollama";
 import * as cheerio from "cheerio";
+import { MODEL, type Link } from "..";
+import { linkContentSummaryPrompt } from "./prompts";
 
 export interface SiteData {
-  links: URL[],
-  contents: string
+  links: URL[];
+  contents: string;
 }
 
 export async function scrapeSiteData(targetUrl: URL): Promise<SiteData | null> {
+  let combined = "";
+
   try {
     const response = await fetch(targetUrl);
 
@@ -18,6 +23,7 @@ export async function scrapeSiteData(targetUrl: URL): Promise<SiteData | null> {
 
     // Extract Title
     const title = $("title").text().trim() || "No title found";
+    title.substring(0, 2000);
 
     // Target the body element
     const body = $("body");
@@ -29,11 +35,9 @@ export async function scrapeSiteData(targetUrl: URL): Promise<SiteData | null> {
       // Extract text and normalize whitespace (similar to BeautifulSoup's strip=True)
       const text = body.text().replace(/\s\s+/g, "\n").trim();
 
-      const combined = `${title}\n\n${text}`;
+      combined = `${title}\n\n${text}`;
       combined.substring(0, 2000);
     }
-
-    const contents = title.substring(0, 2000);
 
     // We store the 'href' string in the Set to ensure uniqueness,
     // as two different URL objects are never "equal" in JS.
@@ -57,10 +61,32 @@ export async function scrapeSiteData(targetUrl: URL): Promise<SiteData | null> {
 
     return {
       links,
-      contents,
+      contents: combined,
     };
   } catch (error) {
     console.error(`Scraping failed: ${error}`);
     return null;
+  }
+}
+
+export async function enrichLinkData(link: Link): Promise<string> {
+  try {
+    const linkSummaryPrompt = linkContentSummaryPrompt(link.link);
+
+    const contentSummary = await ollama.chat({
+      model: MODEL,
+      messages: [
+        { role: "system", content: linkSummaryPrompt.system },
+        { role: "user", content: linkSummaryPrompt.user },
+      ],
+      options: {
+        temperature: 0,
+      },
+    });
+
+    return `\n## Link: ${link.link}\n## Type: ${link.linkType}\n## Contents: ${contentSummary}`;
+  } catch (error) {
+    console.error(`Scraping failed: ${error}`);
+    return "";
   }
 }

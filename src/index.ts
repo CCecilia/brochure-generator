@@ -5,7 +5,7 @@ import { brochureCreationPrompt, evalutateLinksPrompt } from "./modules/prompts"
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-
+export const MODEL = "deepseek-r1:7b"
 
 export interface Link {
   linkType: string;
@@ -19,6 +19,8 @@ export interface RelevantLinks {
 const args = Bun.argv;
 const inputCompanyName = args[2];
 const inputSite = args[3];
+
+console.log(args)
 
 function failureExit(): void {
   console.error("Please provide a website address and company name");
@@ -69,7 +71,7 @@ async function createBrochure(companyName: string, siteURL: URL) {
     .describe("Expected response schema");
   const linksPrompt = evalutateLinksPrompt(siteURL, siteData)
   const response = await ollama.chat({
-    model: "deepseek-r1:7b",
+    model: MODEL,
     messages: [
       { role: "system", content: linksPrompt.system },
       { role: "user", content: linksPrompt.user },
@@ -88,13 +90,13 @@ async function createBrochure(companyName: string, siteURL: URL) {
     JSON.parse(response.message.content),
   );
 
-  const brochurePrompt = brochureCreationPrompt(
+  const brochurePrompt = await brochureCreationPrompt(
     companyName,
     siteData,
     structuredLinkRes.relevantLinks,
   );
   const brochureResponse = await ollama.chat({
-    model: "deepseek-r1:7b",
+    model: MODEL,
     messages: [
       { role: "system", content: brochurePrompt.system },
       { role: "user", content: brochurePrompt.user },

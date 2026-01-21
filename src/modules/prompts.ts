@@ -1,5 +1,5 @@
 import type { Link } from "..";
-import type { SiteData } from "./scraper";
+import { enrichLinkData, type SiteData } from "./scraper";
 
 export interface PromptData {
   user: string,
@@ -34,27 +34,44 @@ Links (some might be relative links): \n${siteData.links.map((url) => url.href).
   };
 }
 
-export function brochureCreationPrompt(
+export async function brochureCreationPrompt(
   companyName: string,
   siteData: SiteData,
   relevantLinks: Link[],
-): PromptData {
+): Promise<PromptData> {
   const systemInstruction = `
 You are an assistant that analyzes the contents of several relevant pages from a company website
 and creates a short brochure about the company for prospective customers, investors and recruits.
 Respond in markdown without code blocks.
 Include details of company culture, customers and careers/jobs if you have the information.
 `;
+  let relevantLinkText = "## Relevant Links: \n";
+
+  for (let index = 0; index < relevantLinks.length; index++) {
+    const element = relevantLinks[index];
+    if (element) {
+      relevantLinkText += await enrichLinkData(element);
+    }
+  }
   const userPrompt = `
 You are looking at a company called: ${companyName}
 Here are the contents of its landing page and other relevant pages;
 use this information to build a short brochure of the company in markdown without code blocks.\n\n
 ## Landing Page:\n${siteData.contents}\n\n
-## Relevant Links: \n${relevantLinks.map((link) => `\n##Link: ${link.link}`)}
+${relevantLinkText}
   `;
 
   return {
     system: systemInstruction,
     user: userPrompt
   }
+}
+
+export function linkContentSummaryPrompt(link: string): PromptData {
+  const systemInstruction = `You are an assistant that analyzes the contents of a webpage and creates a short one paragraph summary. Respond in markdown without code blocks.`;
+  const userPrompt = `Please provide a summary of this web page\n## Page: ${link}`
+  return {
+    system: systemInstruction,
+    user: userPrompt,
+  };
 }
